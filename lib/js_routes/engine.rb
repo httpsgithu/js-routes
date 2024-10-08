@@ -1,3 +1,5 @@
+require "rails/engine"
+
 module JsRoutes
 class SprocketsExtension
   def initialize(filename, &block)
@@ -29,7 +31,8 @@ end
 
 
 class Engine < ::Rails::Engine
-  if defined?(::Sprockets::Railtie)
+  def self.install_sprockets!
+    return if defined?(@installed_sprockets)
     require 'sprockets/version'
     v2                = Gem::Dependency.new('', ' ~> 2')
     vgte3             = Gem::Dependency.new('', ' >= 3')
@@ -58,6 +61,10 @@ class Engine < ::Rails::Engine
         raise StandardError, "Sprockets version #{sprockets_version} is not supported"
       end
     end
+    @installed_sprockets = true
+  end
+  if defined?(::Sprockets::Railtie)
+    install_sprockets!
   end
 end
 end

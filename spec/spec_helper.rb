@@ -7,7 +7,7 @@ require 'rails/all'
 require 'js-routes'
 require 'active_support/core_ext/hash/slice'
 
-unless ENV['TRAVIS_CI']
+unless ENV['CI']
   code = system("yarn build")
   unless code
     exit(1)
@@ -54,6 +54,10 @@ rescue MiniRacer::RuntimeError => e
   raise e
 end
 
+def evallib(**options)
+  evaljs(JsRoutes.generate(**options), filename: 'lib/routes.js')
+end
+
 def test_routes
   ::App.routes.url_helpers
 end
@@ -72,6 +76,10 @@ end
 
 def expectjs(string)
   expect(evaljs(string))
+end
+
+def gem_root
+  Pathname.new(File.expand_path('..', __dir__))
 end
 
 ActiveSupport::Inflector.inflections do |inflect|
@@ -94,10 +102,6 @@ end
 
 
 class ::App < Rails::Application
-  # Enable the asset pipeline
-  config.assets.enabled = true
-  # initialize_on_precompile
-  config.assets.initialize_on_precompile = true
   config.paths['config/routes.rb'] << 'spec/config/routes.rb'
   config.root = File.expand_path('../dummy', __FILE__)
 end

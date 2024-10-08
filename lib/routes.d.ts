@@ -32,8 +32,8 @@ declare type RequiredParameters<T extends number> = T extends 1 ? [RequiredRoute
     RequiredRouteParameter,
     RequiredRouteParameter
 ] : RequiredRouteParameter[];
-declare type RouteHelperOptions<T extends string> = RouteOptions & Optional<Record<T, OptionalRouteParameter>>;
-declare type RouteHelper<T extends number = number, U extends string = string> = ((...args: [...RequiredParameters<T>, RouteHelperOptions<U>]) => string) & RouteHelperExtras;
+declare type RouteHelperOptions = RouteOptions & Record<string, OptionalRouteParameter>;
+declare type RouteHelper<T extends number = number> = ((...args: [...RequiredParameters<T>, RouteHelperOptions]) => string) & RouteHelperExtras;
 declare type RouteHelpers = Record<string, RouteHelper>;
 declare type Configuration = {
     prefix: string;
@@ -64,6 +64,7 @@ declare type ModuleType = "CJS" | "AMD" | "UMD" | "ESM" | "DTS" | "NIL";
 declare const RubyVariables: {
     PREFIX: string;
     DEPRECATED_GLOBBING_BEHAVIOR: boolean;
+    DEPRECATED_FALSE_PARAMETER_BEHAVIOR: boolean;
     SPECIAL_OPTIONS_KEY: string;
     DEFAULT_URL_OPTIONS: RouteParameters;
     SERIALIZER: Serializer;
@@ -75,5 +76,5 @@ declare const define: undefined | (((arg: unknown[], callback: () => unknown) =>
     amd?: unknown;
 });
 declare const module: {
-    exports: any;
+    exports: unknown;
 } | undefined;

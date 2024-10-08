@@ -1,8 +1,17 @@
 # JsRoutes
-[![Build Status](https://travis-ci.org/railsware/js-routes.svg?branch=master)](https://travis-ci.org/railsware/js-routes)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frailsware%2Fjs-routes.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Frailsware%2Fjs-routes?ref=badge_shield)
 
-Generates javascript file that defines all Rails named routes as javascript helpers
+[![CI](https://github.com/railsware/js-routes/actions/workflows/ci.yml/badge.svg)](https://github.com/railsware/js-routes/actions/workflows/ci.yml)
+
+Generates javascript file that defines all Rails named routes as javascript helpers:
+
+``` js
+import { root_path, api_user_path } from './routes';
+
+root_path() # => /
+api_user_path(25, include_profile: true, format: 'json') // => /api/users/25.json?include_profile=true
+```
+
+[More Examples](#usage)
 
 ## Intallation
 
@@ -16,21 +25,22 @@ gem "js-routes"
 
 There are several possible ways to setup JsRoutes:
 
-* [Quick and easy](#quick-start)
+1. [Quick and easy](#quick-start) - Recommended
   * Uses Rack Middleware to automatically update routes locally
-  * Automatically generates routes files on `assets:precompile` in production
+  * Automatically generates routes files on javascript build
   * Works great for a simple Rails application
-* [Webpacker ERB Loader](#webpacker)
+2. [Advanced Setup](#advanced-setup)
+  * Allows very custom setups
+  * Automatic updates need to be customized
+3. [Webpacker ERB Loader](#webpacker) - Legacy
   * Requires ESM module system (the default)
   * Doesn't support typescript definitions
-* [Advanced Setup](#advanced-setup)
-  * Allows very custom setups
-* [Sprockets](#sprockets) legacy
+4. [Sprockets](#sprockets) - Legacy
   * Deprecated and not recommended for modern apps
 
-<div id='quick-start'></div>
+<div id="quick-start"></div>
 
-### Quick Start 
+### Quick Start
 
 Setup [Rack Middleware](https://guides.rubyonrails.org/rails_on_rack.html#action-dispatcher-middleware-stack) 
 to automatically generate and maintain `routes.js` file and corresponding 
@@ -52,20 +62,21 @@ Add the following to `config/environments/development.rb`:
   config.middleware.use(JsRoutes::Middleware)
 ```
 
-Use it in `app/javascript/packs/application.js`:
+Use it in any JS file:
 
 ``` javascript
-import * as Routes from '../routes';
-// window.Routes = Routes;
-alert(Routes.post_path(1))
+import {post_path} from '../routes';
+
+alert(post_path(1))
 ```
 
-Upgrade `rake assets:precompile` to update js-routes files in `Rakefile`: 
+Upgrade js building process to update js-routes files in `Rakefile`: 
 
 ``` ruby
-namespace :assets do
-  task :precompile => "js:routes:typescript"
-end
+task "javascript:build" => "js:routes:typescript"
+# For setups without jsbundling-rails
+task "assets:precompile" => "js:routes:typescript"
+
 ```
 
 Add js-routes files to `.gitignore`:
@@ -75,12 +86,11 @@ Add js-routes files to `.gitignore`:
 /app/javascript/routes.d.ts
 ```
 
-<div id='webpacker'></div>
+<div id="webpack"></div>
 
 ### Webpacker ERB loader
 
-**IMPORTANT**: this setup doesn't support IDE autocompletion with [Typescript](https://www.typescriptlang.org/docs/handbook/declaration-files/templates/module-d-ts.html)
-
+**IMPORTANT**: the setup doesn't support IDE autocompletion with [Typescript](https://www.typescriptlang.org/docs/handbook/declaration-files/templates/module-d-ts.html)
 
 #### Use a Generator
 
@@ -131,63 +141,86 @@ Create routes file `app/javascript/routes.js.erb`:
 <%= JsRoutes.generate() %>
 ```
 
-Use routes wherever you need them `app/javascript/packs/application.js`: 
+Use routes wherever you need them:
 
 ``` javascript
-import * as Routes from 'routes.js.erb';
-window.Routes = Routes;
+import {post_path} from 'routes.js.erb';
+
+alert(post_path(2));
 ```
 
-<div id='advanced-setup'></div>
+<div id="advanced-setup"></div>
 
 ### Advanced Setup
 
-**IMPORTANT**: that this setup requires the JS routes file to be updates manually
-
-Routes file can be generated with a `rake` task:
-
-``` sh
-rake js:routes 
-# OR for typescript support
-rake js:routes:typescript
-```
-
-In case you need multiple route files for different parts of your application, you have to create the files manually.
-If your application has an `admin` and an `application` namespace for example:
-
-**IMPORTANT**: Requires [Webpacker ERB Loader](#webpacker) setup.
-
-``` erb
-// app/javascript/admin/routes.js.erb
-<%= JsRoutes.generate(include: /admin/) %>
-```
-
-``` erb
-// app/javascript/customer/routes.js.erb
-<%= JsRoutes.generate(exclude: /admin/) %>
-```
-
-You can manipulate the generated helper manually by injecting ruby into javascript:
-
-``` erb
-export const routes = <%= JsRoutes.generate(module_type: nil, namespace: nil) %>
-```
-
-If you want to generate the routes files outside of the asset pipeline, you can use `JsRoutes.generate!`:
+In case you need multiple route files for different parts of your application, there are low level methods:
 
 ``` ruby
-path = Rails.root.join("app/javascript")
-
-JsRoutes.generate!("#{path}/app_routes.js", exclude: [/^admin_/, /^api_/])
-JsRoutes.generate!("#{path}/adm_routes.js", include: /^admin_/)
-JsRoutes.generate!("#{path}/api_routes.js", include: /^api_/, default_url_options: {format: "json"})
+# Returns a routes file as a string
+JsRoutes.generate(options)
+# Writes routes to specific file location
+JsRoutes.generate!(file_name, options)
+# Writes Typescript definitions file for routes
+JsRoutes.definitions!(file_name, options)
 ```
 
-<div id='definitions'></div>
+They can also be used in ERB context
+
+``` erb
+<script>
+    var AdminRoutes = <%= JsRoutes.generate(
+      include: /admin/, module_type: nil, namespace: nil
+    ) %>;
+</script>
+```
+
+Routes can be returns via API:
+
+``` ruby
+class Api::RoutesController < Api::BaseController
+  def index
+    options = {
+      include: /\Aapi_/,
+      default_url_options: { format: 'json' },
+    }
+    render json: {
+      routes: {
+        source: JsRoutes.generate(options),
+        definitions: JsRoutes.definitions(options),
+      }
+    }
+  end
+end
+
+```
+
+Default auto-update middleware for development
+doesn't support configuration out of the box,
+but it can be extended through inheritence:
+
+``` ruby
+class AdvancedJsRoutesMiddleware < JsRoutes::Middleware
+  def regenerate
+    path = Rails.root.join("app/javascript")
+
+    JsRoutes.generate!(
+      "#{path}/app_routes.js", exclude: [/^admin_/, /^api_/]
+    )
+    JsRoutes.generate!(
+    "#{path}/adm_routes.js", include: /^admin_/
+    )
+    JsRoutes.generate!(
+      "#{path}/api_routes.js", include: /^api_/, default_url_options: {format: "json"}
+    )
+  end
+end
+```
+
+<div id="definitions"></div>
 
 #### Typescript Definitions
 
-JsRoutes has typescript support out of the box. 
+JsRoutes has typescript support out of the box.
 
 Restrictions:
 
@@ -199,7 +232,7 @@ More advanced setup would involve calling manually:
 
 ``` ruby
 JsRoutes.definitions! # to output to file
-# or 
+# or
 JsRoutes.definitions # to output to string
 ```
 
@@ -250,11 +283,12 @@ end
 Or dynamically in JavaScript, although only [Formatter Options](#formatter-options) are supported:
 
 ``` js
-import * as Routes from 'routes'
-Routes.configure({
+import {configure, config} from 'routes'
+
+configure({
   option: value
 });
-Routes.config(); // current config
+config(); // current config
 ```
 
 ### Available Options
@@ -288,7 +322,7 @@ Options to configure JavaScript file generator. These options are only available
   * Note: generated URLs will first use the protocol, host, and port options specified in the route definition. Otherwise, the URL will be based on the option specified in the `default_url_options` config. If no default option has been set, then the URL will fallback to the current URL based on `window.location`.
 * `compact` - Remove `_path` suffix in path routes(`*_url` routes stay untouched if they were enabled)
   * Default: `false`
-  * Sample route call when option is set to true: Routes.users() => `/users`
+  * Sample route call when option is set to true: `users() // => /users`
 * `application` - a key to specify which rails engine you want to generate routes too.
   * This option allows to only generate routes for a specific rails engine, that is mounted into routes instead of all Rails app routes
   * Default: `Rails.application`
@@ -321,41 +355,44 @@ Options to configure routes formatting. These options are available both in Ruby
 Configuration above will create a nice javascript file with `Routes` object that has all the rails routes available:
 
 ``` js
-import * as Routes from 'routes';
+import {
+  user_path, user_project_path, company_path
+} as Routes from 'routes';
 
-Routes.users_path() 
+users_path() 
   // => "/users"
 
-Routes.user_path(1) 
+user_path(1) 
   // => "/users/1"
   
-Routes.user_path(1, {format: 'json'}) 
+user_path(1, {format: 'json'}) 
   // => "/users/1.json"
 
-Routes.user_path(1, {anchor: 'profile'}) 
+user_path(1, {anchor: 'profile'}) 
   // => "/users/1#profile"
 
-Routes.new_user_project_path(1, {format: 'json'}) 
+new_user_project_path(1, {format: 'json'}) 
   // => "/users/1/projects/new.json"
 
-Routes.user_project_path(1,2, {q: 'hello', custom: true}) 
+user_project_path(1,2, {q: 'hello', custom: true}) 
   // => "/users/1/projects/2?q=hello&custom=true"
 
-Routes.user_project_path(1,2, {hello: ['world', 'mars']}) 
+user_project_path(1,2, {hello: ['world', 'mars']}) 
   // => "/users/1/projects/2?hello%5B%5D=world&hello%5B%5D=mars"
 
 var google = {id: 1, name: "Google"};
-Routes.company_path(google) 
+company_path(google) 
   // => "/companies/1"
 
 var google = {id: 1, name: "Google", to_param: "google"};
-Routes.company_path(google) 
+company_path(google) 
   // => "/companies/google"
 ```
 
 In order to make routes helpers available globally:
 
 ``` js
+import * as Routes from '../routes';
 jQuery.extend(window, Routes)
 ```
 
@@ -364,22 +401,18 @@ jQuery.extend(window, Routes)
 Possible to get `spec` of route by function `toString`:
 
 ```js
-Routes.users_path.toString() // => "/users(.:format)"
-Routes.user_path.toString() // => "/users/:id(.:format)"
+import {user_path, users_path}  from '../routes'
+
+users_path.toString() // => "/users(.:format)"
+user_path.toString() // => "/users/:id(.:format)"
 ```
 
-This function allow to get the same `spec` for route, if you will get string representation of the route function:
-
-```js
-'' + Routes.users_path // => "/users(.:format)", a string representation of the object
-'' + Routes.user_path // => "/users/:id(.:format)"
-```
 
 Route function also contain method `requiredParams` inside which returns required param names array:
 
 ```js
-Routes.users_path.requiredParams() // => []
-Routes.user_path.requiredParams() // => ['id']
+users_path.requiredParams() // => []
+user_path.requiredParams() // => ['id']
 ```
 
 
@@ -393,8 +426,10 @@ Sometimes the destinction between JS Hash and Object can not be found by JsRoute
 In this case you would need to pass a special key to help:
 
 ``` js
-Routes.company_project_path({company_id: 1, id: 2}) // => Not enough parameters
-Routes.company_project_path({company_id: 1, id: 2, _options: true}) // => "/companies/1/projects/2"
+import {company_project_path} from '../routes'
+
+company_project_path({company_id: 1, id: 2}) // => Not enough parameters
+company_project_path({company_id: 1, id: 2, _options: true}) // => "/companies/1/projects/2"
 ```
 
 
@@ -404,9 +439,14 @@ JsRoutes itself does not have security holes.
 It makes URLs without access protection more reachable by potential attacker.
 If that is an issue for you, you may use one of the following solutions:
 
-### Explicit Import + ESM Tree shaking
+### ESM Tree shaking
 
-Make sure `module_type` is set to `ESM` (the default) and JS files import only required routes into the file like:
+Make sure `module_type` is set to `ESM` (the default). Modern JS bundlers like
+[Webpack](https://webpack.js.org) can statically determine which ESM exports are used, and remove
+the unused exports to reduce bundle size. This is known as [Tree
+Shaking](https://webpack.js.org/guides/tree-shaking/).
+
+JS files can use named imports to import only required routes into the file, like:
 
 ``` javascript
 import {
@@ -415,21 +455,26 @@ import {
   inbox_message_path,
   inbox_attachment_path,
   user_path,
-} from 'routes.js.erb'
+} from '../routes'
 ```
 
-Such import structure allows for moddern JS bundlers like [Webpack](https://webpack.js.org/) to only include explicitly imported routes into JS bundle file.
-See [Tree Shaking](https://webpack.js.org/guides/tree-shaking/) for more information.
+JS files can also use star imports (`import * as`) for tree shaking, as long as only explicit property accesses are used.
 
-### Exclude option
+``` javascript
+import * as routes from '../routes';
+
+console.log(routes.inbox_path); // OK, only `inbox_path` is included in the bundle
+
+console.log(Object.keys(routes)); // forces bundler to include all exports, breaking tree shaking
+```
+
+### Exclude/Include options
 
 Split your routes into multiple files related to each section of your website like:
 
-``` javascript
-// admin-routes.js.erb
-<%= JsRoutes.generate(include: /^admin_/) %>
-// app-routes.js.erb
-<%= JsRoutes.generate(exclude: /^admin_/) %>
+``` ruby
+JsRoutes.generate!('app/javascript/admin-routes.js', include: /^admin_/) %>
+JsRoutes.generate!('app/javascript/app-routes.js', exclude: /^admin_/) %>
 ```
 
 ## Advantages over alternatives
@@ -437,17 +482,11 @@ Split your routes into multiple files related to each section of your website li
 There are some alternatives available. Most of them has only basic feature and don't reach the level of quality I accept.
 Advantages of this one are:
 
-* Rails 4,5,6 support
+* Actively maintained
 * [ESM Tree shaking](https://webpack.js.org/guides/tree-shaking/) support
 * Rich options set
 * Full rails compatibility
 * Support Rails `#to_param` convention for seo optimized paths
 * Well tested
 
-#### Thanks to [contributors](https://github.com/railsware/js-routes/contributors)
 
-#### Have fun
-
-
-## License
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frailsware%2Fjs-routes.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Frailsware%2Fjs-routes?ref=badge_large)

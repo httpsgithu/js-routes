@@ -1,7 +1,39 @@
+# Changelog
+
 ## master
+
+## v2.2.10
+
+* Remove sorbet files from repo
+* Clearly define files included in gem
+* Fix Middleware and Middleware generator bugs [#316](https://github.com/railsware/js-routes/issue/316)
+* Remove empty object linter warning on DTS module
+* Generators: Add `.ts` extension when searching for main JS file of the project
+
+## v2.2.9
+
+* Fix middleware error for non-modern setup.
+* Added [Sorbet](https://sorbet.org/) method signatures.
+* Always use DTS module type when calling JsRoutes.definitions or .definitions!. [#313](https://github.com/railsware/js-routes/issues/313)
+
+## v2.2.8
+
+* Leave emoji symbols intact when encoding URI fragment [#312](https://github.com/railsware/js-routes/issues/312)
+* Use webpacker config variable instead of hardcode [#309](https://github.com/railsware/js-routes/issues/309)
+* Use `File.exist?` to be compatible with all versions of ruby [#310](https://github.com/railsware/js-routes/issues/310)
+
+## v2.2.7
+
+* Fix ESM Tree Shaking [#306](https://github.com/railsware/js-routes/issues/306)
+
+## v2.2.6
+
+* Prefer to extend `javascript:build` instead of `assets:precompile`. [#305](https://github.com/railsware/js-routes/issues/305)
+* Add stimulus framework application.js location to generators
 
 ## v2.2.5
 
+* Upgraded eslint and prettier versions [#304](https://github.com/railsware/js-routes/issues/304)
 * Fix middleware generator [#300](https://github.com/railsware/js-routes/issues/300)
 * Support `params` special parameter
 
@@ -12,10 +44,10 @@
 ## v2.2.3
 
 * Fixed NIL module type namespace defintion [#297](https://github.com/railsware/js-routes/issues/297).
-  * The patch may cause a problem with nested `namespace` option 
+  * The patch may cause a problem with nested `namespace` option.
   * Ex. Value like `MyProject.Routes` requires to define `window.MyProject` before importing the routes file
 
-## v2.2.2.
+## v2.2.2
 
 * Fix custom file path [#295](https://github.com/railsware/js-routes/issues/295)
 
@@ -140,10 +172,9 @@ See [UPGRADE TO 2.0](./VERSION_2_UPGRADE.md) for guidance.
 
 * Fixed bug when js-routes is used in envs without window.location #224
 
-
 ## v1.4.0
 
-* __breaking change!__ Implemented Routes.config() and Routes.configure instead of Routes.defaults
+* Implemented Routes.config() and Routes.configure instead of Routes.defaults
 
 New methods support 4 options at the moment:
 
@@ -229,7 +260,7 @@ Routes.configure({
 
 * Support host, port and protocol inline parameters
 * Support host, port and protocol parameters given to a route explicitly
-* Remove all incompatibilities between actiondispatch and js-routes in handling route URLs
+* Remove all incompatibilities between Actiondispatch and js-routes
 
 ## v1.1.2
 
@@ -255,10 +286,10 @@ Routes.configure({
 
 ## v1.0.0
 
- * Add the compact mode [#125](https://github.com/railsware/js-routes/pull/125)
- * Add support for host, protocol, and port configuration [#137](https://github.com/railsware/js-routes/pull/137)
- * Routes path specs [#135](https://github.com/railsware/js-routes/pull/135)
- * Support Rails 4.2 and Ruby 2.2 [#140](https://github.com/railsware/js-routes/pull/140)
+* Add the compact mode [#125](https://github.com/railsware/js-routes/pull/125)
+* Add support for host, protocol, and port configuration [#137](https://github.com/railsware/js-routes/pull/137)
+* Routes path specs [#135](https://github.com/railsware/js-routes/pull/135)
+* Support Rails 4.2 and Ruby 2.2 [#140](https://github.com/railsware/js-routes/pull/140)
 
 ## v0.9.9
 

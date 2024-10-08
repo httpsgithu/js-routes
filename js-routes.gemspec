@@ -4,29 +4,43 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require 'js_routes/version'
 
 Gem::Specification.new do |s|
+  version = JsRoutes::VERSION
   s.name = %q{js-routes}
-  s.version = JsRoutes::VERSION
+  s.version = version
 
-  if s.respond_to? :required_rubygems_version=
-    s.required_rubygems_version = Gem::Requirement.new(">= 0")
-  end
   s.authors = ["Bogdan Gusiev"]
-  s.description = %q{Generates javascript file that defines all Rails named routes as javascript helpers}
+  s.description = %q{Exposes all Rails Routes URL helpers as javascript module}
   s.email = %q{agresso@gmail.com}
   s.extra_rdoc_files = [
     "LICENSE.txt"
   ]
   s.required_ruby_version = '>= 2.4.0'
-  s.files = `git ls-files`.split("\n")
+  s.files = Dir[
+    'app/**/*',
+    'lib/**/*',
+    'CHANGELOG.md',
+    'LICENSE.txt',
+    'Readme.md',
+  ]
   s.homepage = %q{http://github.com/railsware/js-routes}
   s.licenses = ["MIT"]
   s.require_paths = ["lib"]
   s.summary = %q{Brings Rails named routes to javascript}
+  s.metadata = {
+    "bug_tracker_uri"   => "https://github.com/railsware/js-routes/issues",
+    "changelog_uri"     => "https://github.com/railsware/js-routes/blob/v#{version}/CHANGELOG.md",
+    "documentation_uri" => "https://github.com/railsware/js-routes",
+    "source_code_uri"   => "https://github.com/railsware/js-routes/tree/v#{version}/activerecord",
+    "rubygems_mfa_required" => "true",
+    "github_repo" => "ssh://github.com/railsware/js-routes",
+  }
 
   s.add_runtime_dependency(%q<railties>, [">= 4"])
+  s.add_runtime_dependency(%q<sorbet-runtime>)
+
   s.add_development_dependency(%q<sprockets-rails>)
   s.add_development_dependency(%q<rspec>, [">= 3.10.0"])
-  s.add_development_dependency(%q<bundler>, [">= 1.1.0"])
+  s.add_development_dependency(%q<bundler>, [">= 2.2.25"])
   s.add_development_dependency(%q<appraisal>, [">= 0.5.2"])
   s.add_development_dependency(%q<bump>, [">= 0.10.0"])
   if defined?(JRUBY_VERSION)

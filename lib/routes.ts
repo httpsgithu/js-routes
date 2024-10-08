@@ -40,11 +40,10 @@ type RequiredParameters<T extends number> = T extends 1
     ]
   : RequiredRouteParameter[];
 
-type RouteHelperOptions<T extends string> = RouteOptions &
-  Optional<Record<T, OptionalRouteParameter>>;
+type RouteHelperOptions = RouteOptions & Record<string, OptionalRouteParameter>;
 
-type RouteHelper<T extends number = number, U extends string = string> = ((
-  ...args: [...RequiredParameters<T>, RouteHelperOptions<U>]
+type RouteHelper<T extends number = number> = ((
+  ...args: [...RequiredParameters<T>, RouteHelperOptions]
 ) => string) &
   RouteHelperExtras;
 
@@ -82,6 +81,7 @@ type ModuleType = "CJS" | "AMD" | "UMD" | "ESM" | "DTS" | "NIL";
 declare const RubyVariables: {
   PREFIX: string;
   DEPRECATED_GLOBBING_BEHAVIOR: boolean;
+  DEPRECATED_FALSE_PARAMETER_BEHAVIOR: boolean;
   SPECIAL_OPTIONS_KEY: string;
   DEFAULT_URL_OPTIONS: RouteParameters;
   SERIALIZER: Serializer;
@@ -94,11 +94,13 @@ declare const define:
   | undefined
   | (((arg: unknown[], callback: () => unknown) => void) & { amd?: unknown });
 
-declare const module: { exports: any } | undefined;
+declare const module: { exports: unknown } | undefined;
 
+// eslint-disable-next-line
 RubyVariables.WRAPPER(
+  // eslint-disable-next-line
   (): RouterExposedMethods => {
-    const hasProp = (value: unknown, key: string) =>
+    const hasProp = (value: unknown, key: string): boolean =>
       Object.prototype.hasOwnProperty.call(value, key);
     enum NodeTypes {
       GROUP = 1,
@@ -133,11 +135,22 @@ RubyVariables.WRAPPER(
       define: (routes: RouterExposedMethods) => void;
       isSupported: () => boolean;
     };
+
+    const UnescapedSpecials = "-._~!$&'()*+,;=:@"
+      .split("")
+      .map((s) => s.charCodeAt(0));
+    const UnescapedRanges = [
+      ["a", "z"],
+      ["A", "Z"],
+      ["0", "9"],
+    ].map((range) => range.map((s) => s.charCodeAt(0)));
+
     const ModuleReferences: Record<ModuleType, ModuleDefinition> = {
       CJS: {
         define(routes) {
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          module!.exports = routes;
+          if (module) {
+            module.exports = routes;
+          }
         },
         isSupported() {
           return typeof module === "object";
@@ -145,10 +158,11 @@ RubyVariables.WRAPPER(
       },
       AMD: {
         define(routes) {
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          define!([], function () {
-            return routes;
-          });
+          if (define) {
+            define([], function () {
+              return routes;
+            });
+          }
         },
         isSupported() {
           return typeof define === "function" && !!define.amd;
@@ -213,8 +227,6 @@ RubyVariables.WRAPPER(
       }
     }
 
-    const UriEncoderSegmentRegex = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@]/g;
-
     const ReservedOptions = [
       "anchor",
       "trailing_slash",
@@ -223,7 +235,7 @@ RubyVariables.WRAPPER(
       "port",
       "protocol",
     ] as const;
-    type ReservedOption = typeof ReservedOptions[any];
+    type ReservedOption = (typeof ReservedOptions)[any];
 
     class UtilsClass {
       configuration: Configuration = {
@@ -234,7 +246,7 @@ RubyVariables.WRAPPER(
           RubyVariables.SERIALIZER || this.default_serializer.bind(this),
       };
 
-      default_serializer(value: any, prefix?: string | null): string {
+      default_serializer(value: unknown, prefix?: string | null): string {
         if (this.is_nullable(value)) {
           return "";
         }
@@ -293,14 +305,16 @@ RubyVariables.WRAPPER(
           }
           return {
             args: args.slice(0, args.length - 1),
-            options: (last_el as any) as RouteOptions,
+            options: last_el as unknown as RouteOptions,
           };
         } else {
           return { args, options: {} };
         }
       }
 
-      looks_like_serialized_model(object: any): object is ModelRouteParameter {
+      looks_like_serialized_model(
+        object: unknown
+      ): object is ModelRouteParameter {
         return (
           this.is_object(object) &&
           !(this.configuration.special_options_key in object) &&
@@ -310,11 +324,15 @@ RubyVariables.WRAPPER(
 
       path_identifier(object: QueryRouteParameter): string {
         const result = this.unwrap_path_identifier(object);
-        return this.is_nullable(result) || result === false ? "" : "" + result;
+        return this.is_nullable(result) ||
+          (RubyVariables.DEPRECATED_FALSE_PARAMETER_BEHAVIOR &&
+            result === false)
+          ? ""
+          : "" + result;
       }
 
       unwrap_path_identifier(object: QueryRouteParameter): unknown {
-        let result: any = object;
+        let result: unknown = object;
         if (!this.is_object(object)) {
           return object;
         }
@@ -411,15 +429,13 @@ RubyVariables.WRAPPER(
         absolute: boolean,
         args: OptionalRouteParameter[]
       ): string {
-        const {
-          keyword_parameters,
-          query_parameters,
-        } = this.partition_parameters(
-          parts,
-          required_params,
-          default_options,
-          args
-        );
+        const { keyword_parameters, query_parameters } =
+          this.partition_parameters(
+            parts,
+            required_params,
+            default_options,
+            args
+          );
         const missing_params = required_params.filter(
           (param) =>
             !hasProp(query_parameters, param) ||
@@ -519,9 +535,25 @@ RubyVariables.WRAPPER(
       }
 
       encode_segment(segment: string): string {
-        return segment.replace(UriEncoderSegmentRegex, (str) =>
-          encodeURIComponent(str)
-        );
+        if (segment.match(/^[a-zA-Z0-9-]$/)) {
+          // Performance optimization for 99% of cases
+          return segment;
+        }
+        return (segment.match(/./gu) || [])
+          .map((ch) => {
+            const code = ch.charCodeAt(0);
+            if (
+              UnescapedRanges.find(
+                (range) => code >= range[0] && code <= range[1]
+              ) ||
+              UnescapedSpecials.includes(code)
+            ) {
+              return ch;
+            } else {
+              return encodeURIComponent(ch);
+            }
+          })
+          .join("");
       }
 
       is_optional_node(node: NodeTypes): boolean {
@@ -532,7 +564,7 @@ RubyVariables.WRAPPER(
         let key: string;
         switch (route[0]) {
           case NodeTypes.GROUP:
-            return "(" + this.build_path_spec(route[1]) + ")";
+            return `(${this.build_path_spec(route[1])})`;
           case NodeTypes.CAT:
             return (
               this.build_path_spec(route[1]) + this.build_path_spec(route[2])
